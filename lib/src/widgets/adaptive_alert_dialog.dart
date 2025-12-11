@@ -71,6 +71,7 @@ class AdaptiveAlertDialog {
 
       return showCupertinoDialog<void>(
         context: context,
+        barrierColor: Colors.transparent,
         builder: (context) => IOS26AlertDialog(
           title: title,
           message: message,
@@ -94,7 +95,7 @@ class AdaptiveAlertDialog {
           // Build custom content if icon or OTP is present
           if (icon != null || oneTimeCode != null || message != null) {
             contentWidget = ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 60, maxHeight: 300),
+              constraints: const BoxConstraints(maxHeight: 300),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

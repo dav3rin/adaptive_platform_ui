@@ -71,6 +71,7 @@ class IOS26AlertDialog extends StatefulWidget {
     this.iconColor,
     this.oneTimeCode,
     this.input,
+    this.barrierDismissible = true,
   });
 
   /// The title of the alert dialog
@@ -96,6 +97,9 @@ class IOS26AlertDialog extends StatefulWidget {
 
   /// Optional text input configuration
   final AdaptiveAlertDialogInput? input;
+
+  /// Whether the dialog can be dismissed by tapping outside of it
+  final bool barrierDismissible;
 
   @override
   State<IOS26AlertDialog> createState() => _IOS26AlertDialogState();
@@ -166,6 +170,7 @@ class _IOS26AlertDialogState extends State<IOS26AlertDialog> {
         'alertStyle': 'glass',
         'isDark': _isDark,
         if (_effectiveTint != null) 'tint': _colorToARGB(_effectiveTint!),
+        'barrierDismissible': widget.barrierDismissible,
       };
 
       final platformView = UiKitView(
@@ -179,14 +184,11 @@ class _IOS26AlertDialogState extends State<IOS26AlertDialog> {
       );
 
       // Alert dialogs are modal and should fill the screen
-      return Container(
-        color: const Color(0x42000000), // Semi-transparent overlay
-        child: Center(
-          child: SizedBox(
-            width: 270, // Standard iOS alert width
-            height: 200, // Approximate height, will be adjusted by native
-            child: platformView,
-          ),
+      return Center(
+        child: SizedBox(
+          width: 270, // Standard iOS alert width
+          height: 200, // Approximate height, will be adjusted by native
+          child: platformView,
         ),
       );
     }
@@ -245,6 +247,17 @@ class _IOS26AlertDialogState extends State<IOS26AlertDialog> {
 
         // Then call the action
         action.onPressed();
+      }
+    } else if (call.method == 'dismissed') {
+      // Handle dismissal from native side (e.g., barrier tap)
+      if (mounted) {
+        if (widget.input != null) {
+          // Input dialog - return null when dismissed via barrier
+          Navigator.of(context).pop<String?>(null);
+        } else {
+          // Normal dialog - just close
+          Navigator.of(context).pop();
+        }
       }
     }
     return null;

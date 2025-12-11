@@ -74,11 +74,14 @@ class TintAdjustingAlertController: UIAlertController {
 }
 
 /// Platform view for iOS 26 alert dialog
-class iOS26AlertDialogView: NSObject, FlutterPlatformView {
+class iOS26AlertDialogView: NSObject, FlutterPlatformView, UIGestureRecognizerDelegate {
     private let channel: FlutterMethodChannel
     private let container: UIView
     private var alertController: TintAdjustingAlertController?
     private var alertStyle: String = "glass"
+    private var barrierDismissible: Bool = false
+    private var barrierTapGesture: UITapGestureRecognizer?
+    private var isDismissed: Bool = false
 
     init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
         self.channel = FlutterMethodChannel(name: "adaptive_platform_ui/ios26_alert_dialog_\(viewId)", binaryMessenger: messenger)
@@ -101,6 +104,7 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
         var textFieldObscureText: Bool = false
         var textFieldMaxLength: Int? = nil
         var textFieldKeyboardType: String? = nil
+        var barrierDismissible: Bool = false
 
         if let dict = args as? [String: Any] {
             if let t = dict["title"] as? String { title = t }
@@ -120,9 +124,11 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
             if let tfot = dict["textFieldObscureText"] as? Bool { textFieldObscureText = tfot }
             if let tfml = dict["textFieldMaxLength"] as? NSNumber { textFieldMaxLength = tfml.intValue }
             if let tfkt = dict["textFieldKeyboardType"] as? String { textFieldKeyboardType = tfkt }
+            if let bd = dict["barrierDismissible"] as? Bool { barrierDismissible = bd }
         }
 
         self.alertStyle = alertStyleParam
+        self.barrierDismissible = barrierDismissible
 
         super.init()
 
@@ -187,14 +193,17 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
             alert.view.layer.shadowRadius = 10
             alert.view.layer.masksToBounds = false
 
-            // Add glass effect with proper iOS materials
-            let blurEffect = UIBlurEffect(style: isDark ? .systemThinMaterialDark : .systemThinMaterialLight)
+            // Add glass effect with proper iOS materials (using regular blur for maximum transparency)
+            // Using regular blur style instead of material for thinner appearance
+            let blurEffect = UIBlurEffect(style: isDark ? .dark : .light)
             let blurView = UIVisualEffectView(effect: blurEffect)
             blurView.frame = alert.view.bounds
             blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
             blurView.layer.cornerRadius = 28.0
             blurView.layer.cornerCurve = .continuous
             blurView.clipsToBounds = true
+            // Reduce opacity to make it even thinner
+            blurView.alpha = 0.33
 
             // Insert blur view behind content
             alert.view.insertSubview(blurView, at: 0)
@@ -455,7 +464,12 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
                 textColor = isDarkMode ? UIColor.systemOrange.withAlphaComponent(0.9) : .systemOrange
             case "info":
                 alertActionStyle = .default
-                textColor = isDarkMode ? UIColor.systemBlue.withAlphaComponent(0.8) : .systemBlue
+                // Use tint color if available, otherwise fall back to system blue
+                if let tintColor = tint {
+                    textColor = tintColor
+                } else {
+                    textColor = isDarkMode ? UIColor.systemBlue.withAlphaComponent(0.8) : .systemBlue
+                }
             case "disabled":
                 alertActionStyle = .default
                 textColor = isDarkMode ? UIColor.tertiaryLabel.withAlphaComponent(0.6) : .tertiaryLabel
@@ -465,6 +479,15 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
 
             let action = UIAlertAction(title: actionTitle, style: alertActionStyle) { [weak self] _ in
                 guard let self = self, let alert = self.alertController else { return }
+                
+                // Mark as dismissed to prevent barrier tap from also dismissing
+                self.isDismissed = true
+                
+                // Remove barrier tap gesture if it exists
+                if let gesture = self.barrierTapGesture, let gestureView = gesture.view {
+                    gestureView.removeGestureRecognizer(gesture)
+                    self.barrierTapGesture = nil
+                }
 
                 // Get text field value if exists
                 var textFieldValue: String? = nil
@@ -525,7 +548,6 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
         // Set preferred action
         if let action = primaryAction {
             alert.preferredAction = action
-            alert.view.tintColor = UIColor.systemBlue
         } else if let action = cancelAction {
             alert.preferredAction = action
             alert.view.tintColor = UIColor.systemRed
@@ -533,8 +555,14 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
 
         // Present the alert
         DispatchQueue.main.async { [weak self] in
-            if let topController = self?.topViewController() {
-                topController.present(alert, animated: true)
+            guard let self = self else { return }
+            if let topController = self.topViewController() {
+                topController.present(alert, animated: true) {
+                    // Add barrier dismiss gesture after presentation completes
+                    if self.barrierDismissible {
+                        self.setupBarrierDismiss(for: alert)
+                    }
+                }
             }
         }
     }
@@ -588,11 +616,12 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
 
         if #available(iOS 15.0, *) {
             if alertStyle == "glass" {
-                let blurEffect = UIBlurEffect(style: isDark ? .systemThinMaterialDark : .systemThinMaterialLight)
+                let blurEffect = UIBlurEffect(style: isDark ? .dark : .light)
 
                 for subview in alert.view.subviews {
                     if let blurView = subview as? UIVisualEffectView {
                         blurView.effect = blurEffect
+                        blurView.alpha = 0.33
                         break
                     }
                 }
@@ -603,6 +632,103 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
     private func updateStyle(tint: UIColor) {
         guard let alert = alertController else { return }
         alert.view.tintColor = tint
+    }
+    
+    private func setupBarrierDismiss(for alert: UIAlertController) {
+        // Wait a moment for the presentation animation to complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self, let alert = self.alertController else { return }
+            
+            // Find the window that contains the alert
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first else {
+                return
+            }
+            
+            // Find the presentation container view (the view that contains the alert)
+            var presentationView: UIView? = nil
+            self.findPresentationView(in: window, alertView: alert.view, result: &presentationView)
+            
+            guard let containerView = presentationView else { return }
+            
+            // Add tap gesture recognizer to the container
+            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.handleBarrierTap(_:)))
+            tapGesture.delegate = self
+            tapGesture.cancelsTouchesInView = false
+            containerView.addGestureRecognizer(tapGesture)
+            self.barrierTapGesture = tapGesture
+        }
+    }
+    
+    private func findPresentationView(in view: UIView, alertView: UIView, result: inout UIView?) {
+        // Look for a view that contains the alert view but is not the alert view itself
+        // This is typically the _UIPresentationController's view
+        if view !== alertView {
+            // Check if this view contains the alert view
+            var found = false
+            var currentView: UIView? = alertView
+            while let parent = currentView?.superview {
+                if parent === view {
+                    found = true
+                    break
+                }
+                currentView = parent
+            }
+            
+            if found {
+                result = view
+                return
+            }
+        }
+        
+        // Recursively search subviews
+        for subview in view.subviews {
+            findPresentationView(in: subview, alertView: alertView, result: &result)
+            if result != nil {
+                return
+            }
+        }
+    }
+    
+    @objc private func handleBarrierTap(_ gesture: UITapGestureRecognizer) {
+        // Don't handle if already dismissed (e.g., by pressing a button)
+        guard !isDismissed,
+              let alert = alertController,
+              let gestureView = gesture.view else { return }
+        
+        let tapLocation = gesture.location(in: gestureView)
+        
+        // Convert alert view bounds to the gesture view's coordinate system
+        let alertFrame = alert.view.convert(alert.view.bounds, to: gestureView)
+        
+        // If tap is outside the alert view, dismiss it
+        if !alertFrame.contains(tapLocation) {
+            // Mark as dismissed to prevent double dismissal
+            isDismissed = true
+            
+            // Remove the gesture recognizer
+            if let gestureView = gesture.view {
+                gestureView.removeGestureRecognizer(gesture)
+            }
+            barrierTapGesture = nil
+            
+            alert.dismiss(animated: true) { [weak self] in
+                // Notify Flutter that the dialog was dismissed via barrier tap
+                self?.channel.invokeMethod("dismissed", arguments: ["reason": "barrier"])
+            }
+        }
+    }
+    
+    // MARK: - UIGestureRecognizerDelegate
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard let alert = alertController,
+              let gestureView = gestureRecognizer.view else { return true }
+        
+        let touchLocation = touch.location(in: gestureView)
+        let alertFrame = alert.view.convert(alert.view.bounds, to: gestureView)
+        
+        // Only receive touches that are outside the alert view
+        return !alertFrame.contains(touchLocation)
     }
 }
 
