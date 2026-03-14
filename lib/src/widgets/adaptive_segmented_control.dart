@@ -8,8 +8,11 @@ import 'ios26/ios26_segmented_control.dart';
 /// On iOS 26+: Uses native iOS 26 UISegmentedControl with Liquid Glass
 /// On iOS <26 (iOS 18 and below): Uses CupertinoSlidingSegmentedControl
 /// On Android: Uses Material SegmentedButton
+///
+/// Use [AdaptiveSegmentedControl.simulon] for a custom-styled variant
+/// without Liquid Glass, with full control over colors.
 class AdaptiveSegmentedControl extends StatelessWidget {
-  /// Creates an adaptive segmented control
+  /// Creates an adaptive segmented control with system styling
   const AdaptiveSegmentedControl({
     super.key,
     required this.labels,
@@ -22,7 +25,35 @@ class AdaptiveSegmentedControl extends StatelessWidget {
     this.sfSymbols,
     this.iconSize,
     this.iconColor,
-  });
+  })  : _useCustomStyle = false,
+        backgroundColor = null,
+        outlineColor = null,
+        segmentPadding = null,
+        selectedTextColor = null,
+        unselectedTextColor = null;
+
+  /// Creates a custom-styled segmented control (no Liquid Glass)
+  /// with full control over background, selection, outline, and text colors.
+  const AdaptiveSegmentedControl.simulon({
+    super.key,
+    required this.labels,
+    required this.selectedIndex,
+    required this.onValueChanged,
+    this.enabled = true,
+    this.color,
+    this.height = 36.0,
+    this.shrinkWrap = false,
+    this.sfSymbols,
+    this.iconSize,
+    this.iconColor,
+    this.backgroundColor,
+    this.outlineColor,
+    this.segmentPadding,
+    this.selectedTextColor,
+    this.unselectedTextColor,
+  }) : _useCustomStyle = true;
+
+  final bool _useCustomStyle;
 
   /// Segment labels to display, in order
   final List<String> labels;
@@ -54,6 +85,21 @@ class AdaptiveSegmentedControl extends StatelessWidget {
   /// Icon color
   final Color? iconColor;
 
+  /// Background color of the control container (simulon only)
+  final Color? backgroundColor;
+
+  /// Outline/border color drawn on the selected segment indicator (simulon only)
+  final Color? outlineColor;
+
+  /// Padding between the container edge and the segments (simulon only)
+  final double? segmentPadding;
+
+  /// Text color for the selected segment (simulon only)
+  final Color? selectedTextColor;
+
+  /// Text color for unselected segments (simulon only)
+  final Color? unselectedTextColor;
+
   @override
   Widget build(BuildContext context) {
     // iOS 26+ - Use native iOS 26 segmented control
@@ -69,6 +115,12 @@ class AdaptiveSegmentedControl extends StatelessWidget {
         icons: sfSymbols,
         iconSize: iconSize,
         iconColor: iconColor,
+        backgroundColor: backgroundColor,
+        outlineColor: outlineColor,
+        segmentPadding: segmentPadding,
+        useCustomStyle: _useCustomStyle,
+        selectedTextColor: selectedTextColor,
+        unselectedTextColor: unselectedTextColor,
       );
     }
 
@@ -87,16 +139,13 @@ class AdaptiveSegmentedControl extends StatelessWidget {
   }
 
   Widget _buildCupertinoSegmentedControl(BuildContext context) {
-    // Build children map from labels or icons
     final Map<int, Widget> children = {};
 
-    // Check if using icons
     final useIcons = sfSymbols != null && sfSymbols!.isNotEmpty;
     final itemCount = useIcons ? sfSymbols!.length : labels.length;
 
     for (int i = 0; i < itemCount; i++) {
       if (useIcons) {
-        // Icon mode
         final dynamic icon = sfSymbols![i];
         children[i] = Padding(
           padding: const EdgeInsets.all(8),
@@ -105,12 +154,19 @@ class AdaptiveSegmentedControl extends StatelessWidget {
               : Text(icon.toString()),
         );
       } else {
-        // Text mode
+        final isSelected = i == selectedIndex;
+        final textColor = _useCustomStyle
+            ? (isSelected ? selectedTextColor : unselectedTextColor)
+            : null;
         children[i] = Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Text(
             labels[i],
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontSize: _useCustomStyle ? 14 : 13,
+              fontWeight: FontWeight.w500,
+              color: textColor,
+            ),
           ),
         );
       }
@@ -119,12 +175,27 @@ class AdaptiveSegmentedControl extends StatelessWidget {
     Widget control = CupertinoSlidingSegmentedControl<int>(
       children: children,
       groupValue: selectedIndex,
+      backgroundColor: _useCustomStyle && backgroundColor != null
+          ? CupertinoColors.transparent
+          : CupertinoColors.tertiarySystemFill,
+      thumbColor: color ?? const Color(0xFFFFFFFF),
       onValueChanged: (int? value) {
         if (enabled && value != null) {
           onValueChanged(value);
         }
       },
     );
+
+    if (_useCustomStyle && backgroundColor != null) {
+      control = Container(
+        padding: EdgeInsets.all(segmentPadding ?? 0),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(height / 2),
+        ),
+        child: control,
+      );
+    }
 
     if (shrinkWrap) {
       control = Center(child: IntrinsicWidth(child: control));
@@ -136,13 +207,11 @@ class AdaptiveSegmentedControl extends StatelessWidget {
   Widget _buildMaterialSegmentedButton(BuildContext context) {
     final segments = <ButtonSegment<int>>[];
 
-    // Check if using icons
     final useIcons = sfSymbols != null && sfSymbols!.isNotEmpty;
     final itemCount = useIcons ? sfSymbols!.length : labels.length;
 
     for (int i = 0; i < itemCount; i++) {
       if (useIcons) {
-        // Icon mode
         final dynamic icon = sfSymbols![i];
         segments.add(
           ButtonSegment<int>(
@@ -153,7 +222,6 @@ class AdaptiveSegmentedControl extends StatelessWidget {
           ),
         );
       } else {
-        // Text mode
         segments.add(
           ButtonSegment<int>(
             value: i,

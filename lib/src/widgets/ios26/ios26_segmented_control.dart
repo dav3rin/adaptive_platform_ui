@@ -18,6 +18,12 @@ class IOS26SegmentedControl extends StatefulWidget {
     this.icons,
     this.iconSize,
     this.iconColor,
+    this.backgroundColor,
+    this.outlineColor,
+    this.segmentPadding,
+    this.useCustomStyle = false,
+    this.selectedTextColor,
+    this.unselectedTextColor,
   });
 
   /// Segment labels to display, in order
@@ -49,6 +55,24 @@ class IOS26SegmentedControl extends StatefulWidget {
 
   /// Icon color (when using icons)
   final Color? iconColor;
+
+  /// Background color of the control container
+  final Color? backgroundColor;
+
+  /// Outline/border color drawn on the selected segment indicator
+  final Color? outlineColor;
+
+  /// Padding between the container edge and the segmented control
+  final double? segmentPadding;
+
+  /// When true, uses a custom UIView-based control instead of system UISegmentedControl
+  final bool useCustomStyle;
+
+  /// Text color for the selected segment (custom style only)
+  final Color? selectedTextColor;
+
+  /// Text color for unselected segments (custom style only)
+  final Color? unselectedTextColor;
 
   @override
   State<IOS26SegmentedControl> createState() => _IOS26SegmentedControlState();
@@ -136,6 +160,29 @@ class _IOS26SegmentedControlState extends State<IOS26SegmentedControl> {
     // Add icon color if provided
     if (widget.iconColor != null) {
       params['iconColor'] = _colorToARGB(widget.iconColor!);
+    }
+
+    if (widget.backgroundColor != null) {
+      params['backgroundColor'] = _colorToARGB(widget.backgroundColor!);
+    }
+
+    if (widget.outlineColor != null) {
+      params['outlineColor'] = _colorToARGB(widget.outlineColor!);
+    }
+
+    if (widget.segmentPadding != null) {
+      params['segmentPadding'] = widget.segmentPadding!;
+    }
+
+    params['viewHeight'] = widget.height;
+    params['useCustomStyle'] = widget.useCustomStyle;
+
+    if (widget.selectedTextColor != null) {
+      params['selectedTextColor'] = _colorToARGB(widget.selectedTextColor!);
+    }
+
+    if (widget.unselectedTextColor != null) {
+      params['unselectedTextColor'] = _colorToARGB(widget.unselectedTextColor!);
     }
 
     return params;
