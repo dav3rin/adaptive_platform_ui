@@ -65,10 +65,12 @@ export 'src/widgets/adaptive_blur_view.dart';
 
 // iOS 26 specific widgets (for advanced usage)
 export 'src/widgets/ios26/ios26_button.dart';
+export 'src/widgets/ios26/ios26_glass_input_bar.dart';
 export 'src/widgets/ios26/ios26_switch.dart';
 export 'src/widgets/ios26/ios26_slider.dart';
 export 'src/widgets/ios26/ios26_segmented_control.dart';
 export 'src/widgets/ios26/ios26_alert_dialog.dart';
 export 'src/widgets/ios26/ios26_native_search_tab_bar.dart';
 export 'src/widgets/ios26/ios26_native_tab_bar.dart';
+export 'src/widgets/ios26/ios26_native_toolbar.dart';
 export 'src/widgets/ios26/ios26_scaffold_legacy.dart';

@@ -18,6 +18,7 @@ class IOS26NativeToolbar extends StatefulWidget {
     this.onLeadingTap,
     this.onActionTap,
     this.height = 44.0,
+    this.largeTitle = false,
   });
 
   final String? title;
@@ -27,6 +28,13 @@ class IOS26NativeToolbar extends StatefulWidget {
   final VoidCallback? onLeadingTap;
   final ValueChanged<int>? onActionTap;
   final double height;
+
+  /// simulon-app: when true, the swift side renders the title as a
+  /// large bold inline label (e.g. 28pt bold) instead of the standard
+  /// 17pt semibold nav title. Used by [FlatLand2TabView] to get the
+  /// "Assets" / "Renders" large-inline-title look that sits next to
+  /// the trailing actions instead of stacking above them.
+  final bool largeTitle;
 
   @override
   State<IOS26NativeToolbar> createState() => _IOS26NativeToolbarState();
@@ -54,6 +62,7 @@ class _IOS26NativeToolbarState extends State<IOS26NativeToolbar> {
         'actions': widget.actions!
             .map((action) => action.toNativeMap())
             .toList(),
+      'largeTitle': widget.largeTitle,
     };
 
     final toolbar = Container(

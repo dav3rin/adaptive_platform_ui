@@ -73,5 +73,15 @@ public class AdaptivePlatformUiPlugin: NSObject, FlutterPlugin {
             ios26BlurViewFactory,
             withId: "adaptive_platform_ui/ios26_blur_view"
         )
+
+        // Register iOS 26 Glass Input Bar platform view factory.
+        // Pill-shaped UITextField inside a UIGlassEffect / UIVisualEffectView
+        // with a leading SF symbol button (e.g. `plus`). See
+        // [iOS26GlassInputBar.swift] for the method-channel API.
+        let ios26GlassInputBarFactory = iOS26GlassInputBarFactory(messenger: registrar.messenger())
+        registrar.register(
+            ios26GlassInputBarFactory,
+            withId: "adaptive_platform_ui/ios26_glass_input_bar"
+        )
     }
 }

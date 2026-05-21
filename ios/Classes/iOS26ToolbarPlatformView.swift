@@ -111,6 +111,15 @@ class iOS26ToolbarPlatformView: NSObject, FlutterPlatformView {
         let hasActions = params["actions"] as? [[String: Any]] != nil && !(params["actions"] as? [[String: Any]] ?? []).isEmpty
         let hasLeading = params["leading"] != nil
 
+        // simulon-app: when largeTitle=true the title label uses a large
+        // bold font (28pt) and a wider intrinsic width so the toolbar
+        // renders the title inline with the trailing actions at the
+        // size required for flatland_2's nav header.
+        let largeTitle = (params["largeTitle"] as? Bool) ?? false
+        let titleFont: UIFont = largeTitle
+            ? UIFont.systemFont(ofSize: 28, weight: .bold)
+            : UIFont.systemFont(ofSize: 17, weight: .semibold)
+
         // Leading button (left side)
         if let leadingTitle = params["leading"] as? String {
             let leadingButton: UIBarButtonItem
@@ -197,10 +206,10 @@ class iOS26ToolbarPlatformView: NSObject, FlutterPlatformView {
                     if let title = params["title"] as? String, !title.isEmpty {
                         let titleLabel = UILabel()
                         titleLabel.text = title
-                        titleLabel.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
+                        titleLabel.font = titleFont
                         titleLabel.textAlignment = .center
 
-                        let titleSize = (title as NSString).size(withAttributes: [.font: UIFont.systemFont(ofSize: 17, weight: .semibold)])
+                        let titleSize = (title as NSString).size(withAttributes: [.font: titleFont])
                         titleLabel.frame = CGRect(x: 0, y: 0, width: max(titleSize.width, 200), height: 44)
 
                         let titleItem = UIBarButtonItem(customView: titleLabel)
@@ -225,7 +234,7 @@ class iOS26ToolbarPlatformView: NSObject, FlutterPlatformView {
                     if let title = params["title"] as? String, !title.isEmpty {
                         let titleLabel = UILabel()
                         titleLabel.text = title
-                        titleLabel.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
+                        titleLabel.font = titleFont
                         titleLabel.textAlignment = .left
                         titleLabel.sizeToFit()
 
@@ -254,7 +263,7 @@ class iOS26ToolbarPlatformView: NSObject, FlutterPlatformView {
                 if let title = params["title"] as? String, !title.isEmpty {
                     let titleLabel = UILabel()
                     titleLabel.text = title
-                    titleLabel.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
+                    titleLabel.font = titleFont
                     titleLabel.textAlignment = .left
                     titleLabel.sizeToFit()
 

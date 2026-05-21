@@ -142,13 +142,25 @@ class iOS26TabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelegate {
                 let item: UITabBarItem
 
                 // Use UITabBarSystemItem.search for search tabs (iOS 26+ Liquid Glass)
+                // simulon-app: when a custom SF symbol is supplied alongside
+                // isSearch=true, we keep the system-item layout (separated
+                // pill on iOS 26) but override the image with the supplied
+                // symbol via KVC. UIKit blocks the regular `.image=` setter
+                // for items created from a tabBarSystemItem, but KVC bypasses
+                // that lock and replaces the ivar directly — letting us reuse
+                // the native iOS 26 separated-pill layout with a custom icon.
                 if isSearch {
                     if #available(iOS 26.0, *) {
                         item = UITabBarItem(tabBarSystemItem: .search, tag: i)
                         if let title = title {
                             item.title = title
                         }
-
+                        if i < symbols.count && !symbols[i].isEmpty,
+                           let customImage = UIImage(systemName: symbols[i]) {
+                            let templated = customImage.withRenderingMode(.alwaysTemplate)
+                            item.setValue(templated, forKey: "image")
+                            item.setValue(templated, forKey: "selectedImage")
+                        }
                     } else {
                         // Fallback for older iOS versions
                         let searchImage = UIImage(systemName: "magnifyingglass")
@@ -289,13 +301,21 @@ class iOS26TabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelegate {
                     let item: UITabBarItem
 
                     // Use UITabBarSystemItem.search for search tabs (iOS 26+ Liquid Glass)
+                    // simulon-app: same KVC image override as the init path,
+                    // so symbol-overridden separated pills survive runtime
+                    // `setItems` calls.
                     if isSearch {
                         if #available(iOS 26.0, *) {
                             item = UITabBarItem(tabBarSystemItem: .search, tag: i)
                             if let title = title {
                                 item.title = title
                             }
-
+                            if i < symbols.count && !symbols[i].isEmpty,
+                               let customImage = UIImage(systemName: symbols[i]) {
+                                let templated = customImage.withRenderingMode(.alwaysTemplate)
+                                item.setValue(templated, forKey: "image")
+                                item.setValue(templated, forKey: "selectedImage")
+                            }
                         } else {
                             // Fallback for older iOS versions
                             let searchImage = UIImage(systemName: "magnifyingglass")
