@@ -350,7 +350,10 @@ class _AdaptiveScaffoldState extends State<AdaptiveScaffold> {
                             left: 0,
                             right: 0,
                             bottom: 0,
-                            child: tabBar!,
+                            child: _maybeHide(
+                              widget.bottomNavigationBar!.hidden,
+                              tabBar!,
+                            ),
                           ),
                         ],
                       )
@@ -358,7 +361,8 @@ class _AdaptiveScaffoldState extends State<AdaptiveScaffold> {
               ),
             ),
             // Show tab bar at bottom for non-native cases
-            if (!PlatformInfo.isIOS26OrHigher() || !useNativeBottomBar) tabBar!,
+            if (!PlatformInfo.isIOS26OrHigher() || !useNativeBottomBar)
+              _maybeHide(widget.bottomNavigationBar!.hidden, tabBar!),
           ],
         );
 
@@ -653,6 +657,23 @@ class _AdaptiveScaffoldState extends State<AdaptiveScaffold> {
     };
     return iconMap[sfSymbol] ?? CupertinoIcons.circle;
   }
+}
+
+/// Conditionally fade-and-block-input for the tab bar based on the
+/// caller-supplied [AdaptiveBottomNavigationBar.hidden] flag. When
+/// the value flips, AnimatedOpacity animates over 220ms (matching
+/// the rest of the package's native ease-out) so the iOS 26 floating
+/// Liquid-Glass pill dissolves rather than popping.
+Widget _maybeHide(bool hidden, Widget child) {
+  return IgnorePointer(
+    ignoring: hidden,
+    child: AnimatedOpacity(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      opacity: hidden ? 0 : 1,
+      child: child,
+    ),
+  );
 }
 
 /// Minimizable tab bar wrapper for iOS 26+ (used when useNativeToolbar: false)

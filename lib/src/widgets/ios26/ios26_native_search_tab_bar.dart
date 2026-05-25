@@ -47,10 +47,15 @@ class IOS26NativeSearchTabBar {
     void Function(String query)? onSearchQueryChanged,
     void Function(String query)? onSearchSubmitted,
     VoidCallback? onSearchCancelled,
+    VoidCallback? onSearchActivated,
+    VoidCallback? onSearchDeactivated,
   }) async {
-    if (_isEnabled) {
+    final nativeEnabled = await isEnabled();
+    if (_isEnabled && nativeEnabled) {
       return;
     }
+    // Hot restart / failed prior enable can leave Dart and native out of sync.
+    _isEnabled = false;
 
     // Setup method call handler for callbacks
     _channel.setMethodCallHandler((call) async {
@@ -69,6 +74,12 @@ class IOS26NativeSearchTabBar {
           break;
         case 'onSearchCancelled':
           onSearchCancelled?.call();
+          break;
+        case 'onSearchActivated':
+          onSearchActivated?.call();
+          break;
+        case 'onSearchDeactivated':
+          onSearchDeactivated?.call();
           break;
       }
     });
@@ -90,19 +101,54 @@ class IOS26NativeSearchTabBar {
     _isEnabled = true;
   }
 
-  /// Disable native tab bar and return to Flutter-only mode
-  static Future<void> disable() async {
-    if (!_isEnabled) {
+  /// Disable native tab bar and return to Flutter-only mode.
+  ///
+  /// Pass [force: true] when hiding due to navigation cover so the native
+  /// overlay is removed even if Dart's `_isEnabled` flag is out of sync or
+  /// an in-flight `enable()` has not finished yet.
+  static Future<void> disable({bool force = false}) async {
+    if (!force && !_isEnabled) {
       return;
     }
 
-    await _channel.invokeMethod('disableNativeTabBar');
+    final nativeEnabled = force || _isEnabled || await isEnabled();
+    if (nativeEnabled) {
+      await _channel.invokeMethod('disableNativeTabBar');
+    }
     _isEnabled = false;
   }
 
   /// Set the selected tab index
   static Future<void> setSelectedIndex(int index) async {
     await _channel.invokeMethod('setSelectedIndex', {'index': index});
+  }
+
+  /// Animate the native tab bar overlay's alpha (and a subtle glass
+  /// dissolve / slide on the tab bar pill itself) without tearing down
+  /// the underlying `UITabBarController`.
+  ///
+  /// Uses `UIViewPropertyAnimator` on the native side so the iOS 26
+  /// liquid-glass material interpolates instead of popping.
+  ///
+  /// Use this to keep the bar's appearance/disappearance in sync with
+  /// Flutter route transitions (full [disable]/[enable] looks abrupt
+  /// because it tears down and rebuilds the native VC hierarchy).
+  ///
+  /// [delay] is a head-start the Flutter route push gets before the
+  /// bar starts fading out — set to ~50ms when hiding so the bar
+  /// doesn't vanish before the new route's content begins sliding in.
+  static Future<void> setHidden(
+    bool hidden, {
+    bool animated = true,
+    Duration duration = const Duration(milliseconds: 240),
+    Duration delay = Duration.zero,
+  }) async {
+    await _channel.invokeMethod('setOverlayHidden', {
+      'hidden': hidden,
+      'animated': animated,
+      'durationMs': duration.inMilliseconds,
+      'delayMs': delay.inMilliseconds,
+    });
   }
 
   /// Show the search bar (activates the search controller)

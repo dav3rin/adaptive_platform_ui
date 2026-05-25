@@ -36,6 +36,8 @@ class IOS26GlassInputBar extends StatefulWidget {
     this.onLeadingTapped,
     this.onTrailingTapped,
     this.onFocusChanged,
+    this.autofocus = false,
+    this.maxLines = 1,
   });
 
   final String placeholder;
@@ -73,6 +75,19 @@ class IOS26GlassInputBar extends StatefulWidget {
   final VoidCallback? onTrailingTapped;
   final ValueChanged<bool>? onFocusChanged;
 
+  /// Focus the native text field automatically as soon as the platform
+  /// view is ready (after `onPlatformViewCreated` wires the channel).
+  /// On the non-iOS fallback this is forwarded to
+  /// `CupertinoTextField.autofocus`.
+  final bool autofocus;
+
+  /// Maximum number of lines the bar grows to before the inner text
+  /// view starts scrolling internally. The bar starts at `height`
+  /// (one line) and expands upward as the user types/wraps, up to
+  /// `maxLines * lineHeight`. On the non-iOS fallback this is
+  /// forwarded to `CupertinoTextField.maxLines`.
+  final int maxLines;
+
   @override
   State<IOS26GlassInputBar> createState() => IOS26GlassInputBarState();
 }
@@ -80,6 +95,11 @@ class IOS26GlassInputBar extends StatefulWidget {
 class IOS26GlassInputBarState extends State<IOS26GlassInputBar> {
   MethodChannel? _channel;
   String _lastNativeText = '';
+
+  /// Current bar height. Initialised to `widget.height` (one line) and
+  /// driven up to `maxLines * lineHeight` by `onHeightChanged` from
+  /// the native side as the user types and the text wraps.
+  late double _currentHeight = widget.height;
 
   /// Programmatically focus the native text field.
   Future<void> focus() async {
@@ -152,6 +172,15 @@ class IOS26GlassInputBarState extends State<IOS26GlassInputBar> {
         final focused = (call.arguments as Map?)?['focused'] as bool? ?? false;
         widget.onFocusChanged?.call(focused);
         break;
+      case 'onHeightChanged':
+        final height = (call.arguments as Map?)?['height'];
+        if (height is num && mounted) {
+          final next = height.toDouble();
+          if ((next - _currentHeight).abs() > 0.5) {
+            setState(() => _currentHeight = next);
+          }
+        }
+        break;
     }
     return null;
   }
@@ -178,6 +207,8 @@ class IOS26GlassInputBarState extends State<IOS26GlassInputBar> {
       'textColor': _colorToArgb(widget.textColor),
       'placeholderColor': _colorToArgb(widget.placeholderColor),
       'iconColor': _colorToArgb(widget.iconColor),
+      'minHeight': widget.height,
+      'maxLines': widget.maxLines,
     };
   }
 
@@ -187,8 +218,16 @@ class IOS26GlassInputBarState extends State<IOS26GlassInputBar> {
       return _buildFallback(context);
     }
 
-    return SizedBox(
-      height: widget.height,
+    // AnimatedContainer drives the platform view's frame size between
+    // line-counts. UIKit re-lays out the UITextView each animation
+    // frame, so the bar opens / closes with the same easing the rest
+    // of iOS 26 uses for inline-edit growth (Mail compose, iMessage).
+    // Curve approximates the standard Apple ease-out used for
+    // capsule resize — short, no overshoot, no Material lateness.
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      height: _currentHeight,
       child: UiKitView(
         viewType: 'adaptive_platform_ui/ios26_glass_input_bar',
         creationParams: _creationParams(),
@@ -210,6 +249,9 @@ class IOS26GlassInputBarState extends State<IOS26GlassInputBar> {
             _lastNativeText = text;
             _channel!.invokeMethod<void>('setText', {'text': text});
           }
+          if (widget.autofocus) {
+            _channel!.invokeMethod<void>('focus');
+          }
         },
       ),
     );
@@ -223,6 +265,9 @@ class IOS26GlassInputBarState extends State<IOS26GlassInputBar> {
       child: CupertinoTextField(
         controller: widget.controller,
         placeholder: widget.placeholder,
+        autofocus: widget.autofocus,
+        minLines: 1,
+        maxLines: widget.maxLines,
         placeholderStyle: TextStyle(color: widget.placeholderColor),
         style: TextStyle(color: widget.textColor),
         decoration: BoxDecoration(

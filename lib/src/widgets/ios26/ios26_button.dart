@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -317,9 +318,17 @@ class _IOS26ButtonState extends State<IOS26Button> {
         creationParamsCodec: const StandardMessageCodec(),
       );
 
-      // Wrap in SizedBox for height constraint
+      // Resolve the effective height: honor `minSize.height` when it
+      // exceeds the size preset's height so callers can opt into a
+      // taller pill (e.g. to align with a 52pt input bar). Without
+      // this, `minSize.height` is silently dropped and the pill stays
+      // locked to the enum preset (28 / 36 / 44).
+      final double effectiveHeight = widget.minSize != null
+          ? math.max(widget.minSize!.height, _height)
+          : _height;
+
       Widget buttonWidget = SizedBox(
-        height: _height,
+        height: effectiveHeight,
         child: widget.isChildMode
             ? Stack(
                 children: [
@@ -330,11 +339,10 @@ class _IOS26ButtonState extends State<IOS26Button> {
             : platformView,
       );
 
-      // Apply width constraint if minSize is provided
       if (widget.minSize != null) {
         buttonWidget = SizedBox(
           width: widget.minSize!.width,
-          height: _height,
+          height: effectiveHeight,
           child: widget.isChildMode
               ? Stack(
                   children: [

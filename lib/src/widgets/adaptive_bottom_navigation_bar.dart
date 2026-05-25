@@ -25,6 +25,7 @@ class AdaptiveBottomNavigationBar {
     this.bottomNavigationBar,
     this.selectedItemColor,
     this.unselectedItemColor,
+    this.hidden = false,
   });
 
   /// Navigation items for bottom navigation bar
@@ -88,6 +89,12 @@ class AdaptiveBottomNavigationBar {
   /// If null, uses platform defaults.
   final Color? unselectedItemColor;
 
+  /// Hide the bar without unmounting it. Animated where the
+  /// underlying surface supports it (iOS 26+ native UITabBar fades
+  /// its `alpha` via `UIView.animate`; other backends fall back to a
+  /// Flutter `AnimatedOpacity`). Defaults to `false` (visible).
+  final bool hidden;
+
   /// Creates a copy of this bottom navigation bar with the given fields replaced
   AdaptiveBottomNavigationBar copyWith({
     List<AdaptiveNavigationDestination>? items,
@@ -98,6 +105,7 @@ class AdaptiveBottomNavigationBar {
     Widget? bottomNavigationBar,
     Color? selectedItemColor,
     Color? unselectedItemColor,
+    bool? hidden,
   }) {
     return AdaptiveBottomNavigationBar(
       items: items ?? this.items,
@@ -108,6 +116,7 @@ class AdaptiveBottomNavigationBar {
       bottomNavigationBar: bottomNavigationBar ?? this.bottomNavigationBar,
       selectedItemColor: selectedItemColor ?? this.selectedItemColor,
       unselectedItemColor: unselectedItemColor ?? this.unselectedItemColor,
+      hidden: hidden ?? this.hidden,
     );
   }
 }

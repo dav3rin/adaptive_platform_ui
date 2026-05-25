@@ -180,36 +180,49 @@ class _IOS26ScaffoldState extends State<IOS26Scaffold>
             left: 0,
             right: 0,
             bottom: 0,
-            child: AnimatedBuilder(
-              animation: _tabBarAnimation,
-              builder: (context, child) {
-                // Calculate minimized state
-                // value: 0.0 = expanded (full size), 1.0 = minimized (70% size, 50% opacity)
-                final minimizeProgress = _tabBarAnimation.value;
-                final scale = 1.0 - (minimizeProgress * 0.3); // 1.0 → 0.7
-                final opacity = 1.0 - (minimizeProgress * 0.5); // 1.0 → 0.5
+            child: IgnorePointer(
+              ignoring: widget.bottomNavigationBar!.hidden,
+              // Caller-driven hide (e.g. while a soft keyboard is up).
+              // Animated so the floating Liquid-Glass pill dissolves
+              // instead of popping out. Duration / curve match the
+              // standard 220ms ease-out used elsewhere in the package
+              // for native size transitions.
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                opacity: widget.bottomNavigationBar!.hidden ? 0 : 1,
+                child: AnimatedBuilder(
+                  animation: _tabBarAnimation,
+                  builder: (context, child) {
+                    // Calculate minimized state
+                    // value: 0.0 = expanded (full size), 1.0 = minimized (70% size, 50% opacity)
+                    final minimizeProgress = _tabBarAnimation.value;
+                    final scale = 1.0 - (minimizeProgress * 0.3); // 1.0 → 0.7
+                    final opacity = 1.0 - (minimizeProgress * 0.5); // 1.0 → 0.5
 
-                return Transform.scale(
-                  scale: scale,
-                  alignment: Alignment.bottomCenter,
-                  child: Opacity(opacity: opacity, child: child),
-                );
-              },
-              child: widget.enableBlur
-                  ? IOS26NativeTabBar(
-                      destinations: widget.bottomNavigationBar!.items!,
-                      selectedIndex: widget.bottomNavigationBar!.selectedIndex!,
-                      onTap: widget.bottomNavigationBar!.onTap!,
-                      tint: CupertinoTheme.of(context).primaryColor,
-                      minimizeBehavior: widget.minimizeBehavior,
-                    )
-                  : IOS26NativeTabBar(
-                      destinations: widget.bottomNavigationBar!.items!,
-                      selectedIndex: widget.bottomNavigationBar!.selectedIndex!,
-                      onTap: widget.bottomNavigationBar!.onTap!,
-                      tint: CupertinoTheme.of(context).primaryColor,
-                      minimizeBehavior: widget.minimizeBehavior,
-                    ),
+                    return Transform.scale(
+                      scale: scale,
+                      alignment: Alignment.bottomCenter,
+                      child: Opacity(opacity: opacity, child: child),
+                    );
+                  },
+                  child: widget.enableBlur
+                      ? IOS26NativeTabBar(
+                          destinations: widget.bottomNavigationBar!.items!,
+                          selectedIndex: widget.bottomNavigationBar!.selectedIndex!,
+                          onTap: widget.bottomNavigationBar!.onTap!,
+                          tint: CupertinoTheme.of(context).primaryColor,
+                          minimizeBehavior: widget.minimizeBehavior,
+                        )
+                      : IOS26NativeTabBar(
+                          destinations: widget.bottomNavigationBar!.items!,
+                          selectedIndex: widget.bottomNavigationBar!.selectedIndex!,
+                          onTap: widget.bottomNavigationBar!.onTap!,
+                          tint: CupertinoTheme.of(context).primaryColor,
+                          minimizeBehavior: widget.minimizeBehavior,
+                        ),
+                ),
+              ),
             ),
           ),
       ],
