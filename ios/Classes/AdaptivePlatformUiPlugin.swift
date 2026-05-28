@@ -83,5 +83,14 @@ public class AdaptivePlatformUiPlugin: NSObject, FlutterPlugin {
             ios26GlassInputBarFactory,
             withId: "adaptive_platform_ui/ios26_glass_input_bar"
         )
+
+        // Register iOS 26 Jobs Indicator platform view factory.
+        // SwiftUI cloud/spinner that pulses for 5s when its count
+        // increases. See [iOS26JobsIndicatorView.swift].
+        let ios26JobsIndicatorFactory = iOS26JobsIndicatorViewFactory(messenger: registrar.messenger())
+        registrar.register(
+            ios26JobsIndicatorFactory,
+            withId: "adaptive_platform_ui/ios26_jobs_indicator"
+        )
     }
 }
