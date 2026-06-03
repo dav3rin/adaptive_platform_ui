@@ -64,6 +64,7 @@ class iOS26JobsIndicatorPlatformView: NSObject, FlutterPlatformView {
         let badgeColorArgb = params["badgeColor"] as? Int
         let badgeTextColorArgb = params["badgeTextColor"] as? Int
         let backgroundColorArgb = params["backgroundColor"] as? Int
+        let useGlassBackground = params["useGlassBackground"] as? Bool ?? true
         let spinnerTextSize = (params["spinnerTextSize"] as? Double).map { CGFloat($0) } ?? 10
         let badgeTextSize = (params["badgeTextSize"] as? Double).map { CGFloat($0) } ?? 11
 
@@ -76,7 +77,11 @@ class iOS26JobsIndicatorPlatformView: NSObject, FlutterPlatformView {
         _model.iconColor = Color(uiColor: iconColorArgb.map { UIColor(argb: $0) } ?? UIColor.white.withAlphaComponent(0.85))
         _model.badgeColor = Color(uiColor: badgeColorArgb.map { UIColor(argb: $0) } ?? UIColor.systemBlue)
         _model.badgeTextColor = Color(uiColor: badgeTextColorArgb.map { UIColor(argb: $0) } ?? .white)
-        _model.backgroundColor = Color(uiColor: backgroundColorArgb.map { UIColor(argb: $0) } ?? UIColor.black.withAlphaComponent(0.9))
+        _model.useGlassBackground = useGlassBackground
+        _model.backgroundColor = Color(
+            uiColor: backgroundColorArgb.map { UIColor(argb: $0) }
+                ?? UIColor.black.withAlphaComponent(0.9)
+        )
 
         _channel = FlutterMethodChannel(
             name: "adaptive_platform_ui/ios26_jobs_indicator_\(viewId)",
@@ -158,7 +163,8 @@ final class JobsIndicatorModel: ObservableObject {
     var iconColor: Color = .white.opacity(0.85)
     var badgeColor: Color = .blue
     var badgeTextColor: Color = .white
-    var backgroundColor: Color = .black.opacity(0.9)
+    var backgroundColor: Color = .clear
+    var useGlassBackground: Bool = true
     var activeDuration: TimeInterval = 5
 
     private var hideTask: Task<Void, Never>?
@@ -205,20 +211,54 @@ struct JobsIndicatorView: View {
     }
 }
 
+/// Circular pill backing — Liquid Glass on iOS 26+ (same material family as
+/// [iOS26ButtonView] `.glass()` / flatland_2 [IconPill]).
+private struct JobsIndicatorPillBackground: View {
+    let size: CGFloat
+    let fillColor: Color
+    let useGlass: Bool
+
+    var body: some View {
+        Group {
+            if useGlass {
+                if #available(iOS 26.0, *) {
+                    Color.clear
+                        .frame(width: size, height: size)
+                        .glassEffect(.regular.interactive(), in: .circle)
+                } else {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Circle().stroke(Color.white.opacity(0.18), lineWidth: 1)
+                        )
+                }
+            } else {
+                Circle()
+                    .fill(fillColor)
+                    .overlay(
+                        Circle().stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    )
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 private struct IdleState: View {
     @ObservedObject var model: JobsIndicatorModel
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Circle()
-                .fill(model.backgroundColor)
-                .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 1))
-                .frame(width: model.size, height: model.size)
-                .overlay(
-                    Image(systemName: model.iconName)
-                        .font(.system(size: model.size * 0.5, weight: .medium))
-                        .foregroundStyle(model.iconColor)
-                )
+            JobsIndicatorPillBackground(
+                size: model.size,
+                fillColor: model.backgroundColor,
+                useGlass: model.useGlassBackground
+            )
+            .overlay(
+                Image(systemName: model.iconName)
+                    .font(.system(size: model.size * 0.5, weight: .medium))
+                    .foregroundStyle(model.iconColor)
+            )
 
             if model.count > 0 {
                 let badgeDiameter = max(14, model.badgeTextSize + 4)
@@ -240,9 +280,11 @@ private struct SpinningState: View {
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(model.backgroundColor)
-                .frame(width: model.size, height: model.size)
+            JobsIndicatorPillBackground(
+                size: model.size,
+                fillColor: model.backgroundColor,
+                useGlass: model.useGlassBackground
+            )
 
             // Comet-tail arc: gradient fades along the stroke; `.butt`
             // caps avoid a round blob at the transparent tail (`.round`

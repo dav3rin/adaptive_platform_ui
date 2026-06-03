@@ -53,6 +53,16 @@ public class AdaptivePlatformUiPlugin: NSObject, FlutterPlugin {
             withId: "adaptive_platform_ui/ios26_popup_menu_button"
         )
 
+        // Register iOS 26 ContextMenu Sheet platform view factory.
+        // Native glass options panel embedded in a Flutter-driven lift route
+        // (the real UIMenu can't be presented programmatically). See
+        // [iOS26ContextMenuSheetView.swift].
+        let ios26ContextMenuSheetFactory = iOS26ContextMenuSheetViewFactory(messenger: registrar.messenger())
+        registrar.register(
+            ios26ContextMenuSheetFactory,
+            withId: "adaptive_platform_ui/ios26_context_menu_sheet"
+        )
+
         // Register iOS 26 TabBar platform view factory
         let ios26TabBarFactory = iOS26TabBarViewFactory(messenger: registrar.messenger())
         registrar.register(

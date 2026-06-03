@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
+import '../../style/sf_symbol.dart';
+import '../adaptive_button.dart';
+
 /// Native iOS 26+ jobs indicator pill.
 ///
 /// Renders a SwiftUI view that shows an SF symbol (default `cloud.fill`)
@@ -26,7 +29,8 @@ class IOS26JobsIndicator extends StatefulWidget {
     this.iconColor = const Color(0xD9FFFFFF),
     this.badgeColor = const Color(0xFF007AFF),
     this.badgeTextColor = const Color(0xFFFFFFFF),
-    this.backgroundColor = const Color(0xE6000000),
+    this.backgroundColor,
+    this.useGlassBackground = true,
     this.spinnerTextSize = 10,
     this.badgeTextSize = 11,
     this.semanticsIdentifier,
@@ -50,7 +54,13 @@ class IOS26JobsIndicator extends StatefulWidget {
   final Color iconColor;
   final Color badgeColor;
   final Color badgeTextColor;
-  final Color backgroundColor;
+  /// Pill fill when [useGlassBackground] is false. Omit (null) with glass enabled
+  /// so the native side uses Liquid Glass instead of a solid backing.
+  final Color? backgroundColor;
+
+  /// When true (default), the native pill uses iOS 26 Liquid Glass — matching
+  /// [AdaptiveButton.sfSymbol] / flatland_2 [IconPill].
+  final bool useGlassBackground;
 
   /// Font size for the count shown in the center while the spinner
   /// is active. Matches the original Flutter [JobsIndicator] default
@@ -123,7 +133,9 @@ class _IOS26JobsIndicatorState extends State<IOS26JobsIndicator> {
         'iconColor': _argb(widget.iconColor),
         'badgeColor': _argb(widget.badgeColor),
         'badgeTextColor': _argb(widget.badgeTextColor),
-        'backgroundColor': _argb(widget.backgroundColor),
+        if (widget.backgroundColor != null)
+          'backgroundColor': _argb(widget.backgroundColor!),
+        'useGlassBackground': widget.useGlassBackground,
         'spinnerTextSize': widget.spinnerTextSize,
         'badgeTextSize': widget.badgeTextSize,
       };
@@ -169,6 +181,24 @@ class _IOS26JobsIndicatorState extends State<IOS26JobsIndicator> {
   }
 
   Widget _buildFallback() {
+    if (widget.useGlassBackground) {
+      return SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: AdaptiveButton.sfSymbol(
+          onPressed: widget.onPressed,
+          useSmoothRectangleBorder: false,
+          size: AdaptiveButtonSize.large,
+          minSize: Size(widget.size, widget.size),
+          sfSymbol: SFSymbol(
+            widget.iconName,
+            size: widget.size * 0.5,
+            color: widget.iconColor,
+          ),
+        ),
+      );
+    }
+
     return CupertinoButton(
       padding: EdgeInsets.zero,
       minimumSize: Size(widget.size, widget.size),
@@ -177,7 +207,7 @@ class _IOS26JobsIndicatorState extends State<IOS26JobsIndicator> {
         width: widget.size,
         height: widget.size,
         decoration: BoxDecoration(
-          color: widget.backgroundColor,
+          color: widget.backgroundColor ?? const Color(0xE6000000),
           shape: BoxShape.circle,
           border: Border.all(color: const Color(0x2EFFFFFF)),
         ),

@@ -1,6 +1,15 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../platform/platform_info.dart';
+import 'ios26/ios26_lift_context_menu.dart';
+
+/// Builds the lifted preview for iOS 26+ [AdaptiveContextMenu].
+typedef AdaptiveContextMenuPreviewBuilder =
+    Widget Function(
+      BuildContext context,
+      Animation<double> animation,
+      Widget child,
+    );
 
 /// A context menu action item
 class AdaptiveContextMenuAction {
@@ -40,24 +49,53 @@ class AdaptiveContextMenu extends StatelessWidget {
     super.key,
     required this.child,
     required this.actions,
+    this.onTap,
+    this.onLiftMenuVisibilityChanged,
     this.previewBuilder,
+    this.previewFillsScreen = false,
+    this.previewTargetRect,
+    this.menuSheetBottomPadding = 20.0,
   });
 
   /// The widget to wrap with context menu
   final Widget child;
 
+  /// Short tap callback (iOS 26+ lift menu forwards this; long-press opens menu).
+  final VoidCallback? onTap;
+
+  /// Called when the iOS 26 lift menu route opens (true) or fully dismisses (false).
+  final ValueChanged<bool>? onLiftMenuVisibilityChanged;
+
   /// List of actions to show in the context menu
   final List<AdaptiveContextMenuAction> actions;
 
-  /// Optional preview builder for iOS (shows preview when long pressing)
-  final Widget Function(BuildContext)? previewBuilder;
+  /// Optional preview for iOS 26+ lift menu (backing, corners, etc.).
+  final AdaptiveContextMenuPreviewBuilder? previewBuilder;
+
+  /// When true (iOS 26+), animates the preview to nearly full-screen bounds.
+  final bool previewFillsScreen;
+
+  /// Optional override for the open preview rect when [previewFillsScreen].
+  final Rect Function(BuildContext context, int actionCount)? previewTargetRect;
+
+  /// Extra padding below the menu on top of [SafeArea] (iOS 26+ lift only).
+  final double menuSheetBottomPadding;
 
   @override
   Widget build(BuildContext context) {
-    // iOS 26+ - Use CupertinoContextMenu
-    // Note: Native iOS 26 UIContextMenu could be implemented with platform view for enhanced visuals
+    // iOS 26+ - Flutter lift/reposition of the live child with a native
+    // glass options panel (IOS26LiftContextMenu).
     if (PlatformInfo.isIOS26OrHigher()) {
-      return _buildCupertinoContextMenu(context);
+      return IOS26LiftContextMenu(
+        actions: actions,
+        onTap: onTap,
+        onLiftMenuVisibilityChanged: onLiftMenuVisibilityChanged,
+        previewBuilder: previewBuilder,
+        previewFillsScreen: previewFillsScreen,
+        previewTargetRect: previewTargetRect,
+        menuSheetBottomPadding: menuSheetBottomPadding,
+        child: child,
+      );
     }
 
     // iOS <26 - Use CupertinoContextMenu

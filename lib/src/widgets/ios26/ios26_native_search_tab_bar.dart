@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/services.dart';
 
 /// iOS 26+ Native Tab Bar with Search Support
@@ -43,6 +45,7 @@ class IOS26NativeSearchTabBar {
   static Future<void> enable({
     required List<NativeTabConfig> tabs,
     int selectedIndex = 0,
+    Color? selectedTintColor,
     void Function(int index)? onTabSelected,
     void Function(String query)? onSearchQueryChanged,
     void Function(String query)? onSearchSubmitted,
@@ -96,6 +99,8 @@ class IOS26NativeSearchTabBar {
           )
           .toList(),
       'selectedIndex': selectedIndex,
+      if (selectedTintColor != null)
+        'selectedTint': _colorToARGB(selectedTintColor),
     });
 
     _isEnabled = true;
@@ -151,6 +156,24 @@ class IOS26NativeSearchTabBar {
     });
   }
 
+  /// Dims the native tab bar pill (and search chrome when visible) while a
+  /// Flutter modal such as [IOS26LiftContextMenu] is open. The overlay sits
+  /// above UIKit chrome so [BackdropFilter] on the Flutter route cannot reach
+  /// it; this matches the menu's black tint and blocks tab-bar taps.
+  static Future<void> setModalDimmed(
+    bool dimmed, {
+    double opacity = 0.32,
+    bool animated = true,
+    Duration duration = const Duration(milliseconds: 240),
+  }) async {
+    await _channel.invokeMethod('setOverlayModalDimmed', {
+      'dimmed': dimmed,
+      'opacity': opacity,
+      'animated': animated,
+      'durationMs': duration.inMilliseconds,
+    });
+  }
+
   /// Show the search bar (activates the search controller)
   static Future<void> showSearch() async {
     await _channel.invokeMethod('showSearch');
@@ -159,6 +182,13 @@ class IOS26NativeSearchTabBar {
   /// Hide the search bar
   static Future<void> hideSearch() async {
     await _channel.invokeMethod('hideSearch');
+  }
+
+  static int _colorToARGB(Color color) {
+    return (((color.a * 255.0).round() & 0xFF) << 24) |
+        (((color.r * 255.0).round() & 0xFF) << 16) |
+        (((color.g * 255.0).round() & 0xFF) << 8) |
+        ((color.b * 255.0).round() & 0xFF);
   }
 
   /// Check if native tab bar is currently enabled

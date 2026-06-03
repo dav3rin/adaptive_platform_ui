@@ -18,6 +18,7 @@ class iOS26NativeTabBarManager: NSObject {
     private var browseIndexBeforeSearch: Int = 0
     private var isSearchMorphActive: Bool = false
     private var isEnabled: Bool = false
+    private var selectedTint: UIColor? = nil
 
     /// Pending hide/show work scheduled with a lead-in delay. Cancelled
     /// on rapid toggle so the latest hide/show wins.
@@ -74,7 +75,10 @@ class iOS26NativeTabBarManager: NSObject {
         return nil
     }
 
-    private func enableNativeTabBar(tabs: [TabConfig], selectedIndex: Int) {
+    private func enableNativeTabBar(
+        tabs: [TabConfig], selectedIndex: Int, selectedTint: UIColor? = nil
+    ) {
+        self.selectedTint = selectedTint
         guard let flutterVC = getFlutterViewController() else {
             return
         }
@@ -170,10 +174,21 @@ class iOS26NativeTabBarManager: NSObject {
     /// material transition. On hide, UIKit dematerializes the glass correctly
     /// but snaps tab-item icons/labels to alpha 0 instantly — so we run a
     /// matching alpha fade on the item chrome in parallel (show is fine as-is).
+    private func setOverlayModalDimmed(
+        _ dimmed: Bool, opacity: CGFloat, animated: Bool, durationMs: Int
+    ) {
+        overlayPassthroughView?.setModalDimmed(
+            dimmed, opacity: opacity, animated: animated, durationMs: durationMs)
+    }
+
     private func setOverlayHidden(_ hidden: Bool, animated: Bool, durationMs: Int, delayMs: Int) {
         guard let overlay = overlayPassthroughView,
             let tabBarVC = tabBarController
         else { return }
+
+        if hidden {
+            overlay.setModalDimmed(false, opacity: 0, animated: false, durationMs: 0)
+        }
 
         overlay.isUserInteractionEnabled = !hidden
 
@@ -335,6 +350,10 @@ class iOS26NativeTabBarManager: NSObject {
 
         tabBar.tabBar.standardAppearance = appearance
         tabBar.tabBar.scrollEdgeAppearance = appearance
+
+        if let tint = selectedTint {
+            tabBar.tabBar.tintColor = tint
+        }
     }
 
     private func notifyTabSelected(_ index: Int) {
@@ -382,7 +401,11 @@ class iOS26NativeTabBarManager: NSObject {
             }
 
             let selectedIndex = (args["selectedIndex"] as? Int) ?? 0
-            enableNativeTabBar(tabs: tabs, selectedIndex: selectedIndex)
+            var tint: UIColor? = nil
+            if let argb = args["selectedTint"] as? NSNumber {
+                tint = Self.colorFromARGB(argb.intValue)
+            }
+            enableNativeTabBar(tabs: tabs, selectedIndex: selectedIndex, selectedTint: tint)
             result(nil)
 
         case "disableNativeTabBar":
@@ -396,6 +419,16 @@ class iOS26NativeTabBarManager: NSObject {
             let durationMs = (args?["durationMs"] as? Int) ?? 240
             let delayMs = (args?["delayMs"] as? Int) ?? 0
             setOverlayHidden(hidden, animated: animated, durationMs: durationMs, delayMs: delayMs)
+            result(nil)
+
+        case "setOverlayModalDimmed":
+            let args = call.arguments as? [String: Any]
+            let dimmed = (args?["dimmed"] as? Bool) ?? false
+            let opacity = (args?["opacity"] as? Double) ?? 0.32
+            let animated = (args?["animated"] as? Bool) ?? true
+            let durationMs = (args?["durationMs"] as? Int) ?? 240
+            setOverlayModalDimmed(
+                dimmed, opacity: CGFloat(opacity), animated: animated, durationMs: durationMs)
             result(nil)
 
         case "setSelectedIndex":
@@ -449,6 +482,14 @@ class iOS26NativeTabBarManager: NSObject {
             result(FlutterMethodNotImplemented)
         }
     }
+
+    private static func colorFromARGB(_ argb: Int) -> UIColor {
+        let a = CGFloat((argb >> 24) & 0xFF) / 255.0
+        let r = CGFloat((argb >> 16) & 0xFF) / 255.0
+        let g = CGFloat((argb >> 8) & 0xFF) / 255.0
+        let b = CGFloat(argb & 0xFF) / 255.0
+        return UIColor(red: r, green: g, blue: b, alpha: a)
+    }
 }
 
 // MARK: - Passthrough overlay
@@ -463,7 +504,62 @@ private class PassThroughOverlayView: UIView {
     var searchTabIndex: Int = -1
     var isSearchMorphActive: Bool = false
 
+    private let modalDimScrim = UIView()
+    private(set) var isModalDimmed = false
+    private var modalDimOpacity: CGFloat = 0.32
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        modalDimScrim.isHidden = true
+        modalDimScrim.alpha = 0
+        modalDimScrim.isUserInteractionEnabled = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func setModalDimmed(_ dimmed: Bool, opacity: CGFloat, animated: Bool, durationMs: Int) {
+        isModalDimmed = dimmed
+        modalDimOpacity = opacity
+        modalDimScrim.backgroundColor = UIColor.black.withAlphaComponent(opacity)
+
+        guard let tabBar = tabBarController?.tabBar else { return }
+
+        tabBar.isUserInteractionEnabled = !dimmed
+
+        if dimmed {
+            if modalDimScrim.superview !== tabBar {
+                modalDimScrim.removeFromSuperview()
+                tabBar.addSubview(modalDimScrim)
+            }
+            modalDimScrim.frame = tabBar.bounds
+            modalDimScrim.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            modalDimScrim.isHidden = false
+        }
+
+        let duration = max(0, Double(durationMs)) / 1000.0
+        UIView.animate(
+            withDuration: animated ? duration : 0,
+            delay: 0,
+            options: [.curveEaseOut, .beginFromCurrentState]
+        ) {
+            self.modalDimScrim.alpha = dimmed ? 1 : 0
+        } completion: { _ in
+            if !dimmed {
+                self.modalDimScrim.isHidden = true
+                self.modalDimScrim.removeFromSuperview()
+                self.isModalDimmed = false
+                tabBar.isUserInteractionEnabled = true
+            }
+        }
+    }
+
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        if isModalDimmed {
+            return nil
+        }
+
         guard bounds.contains(point), let tabBarController else { return nil }
         let tabBar = tabBarController.tabBar
         let searchBar = searchController?.searchBar
